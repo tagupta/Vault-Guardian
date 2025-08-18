@@ -51,6 +51,7 @@ contract UniswapAdapter is AStaticUSDCData {
         if (!succ) {
             revert UniswapAdapter__TransferFailed();
         }
+        //@audit-med missing handling of minimum tokens a user should receive. can lead to slippage
         uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
             amountIn: amountOfTokenToSwap,
             amountOutMin: 0,
@@ -63,22 +64,28 @@ contract UniswapAdapter is AStaticUSDCData {
         if (!succ) {
             revert UniswapAdapter__TransferFailed();
         }
+        //@audit-low causing excess approval than needed, amountOfTokenToSwap should be used only
         succ = token.approve(address(i_uniswapRouter), amountOfTokenToSwap + amounts[0]);
         if (!succ) {
             revert UniswapAdapter__TransferFailed();
         }
 
         // amounts[1] should be the WETH amount we got back
+        //@audit-q why has it defined the liquidty of tokenA as amountOfTokenToSwap + amounts[0], but not just amountOfTokenToSwap
         (uint256 tokenAmount, uint256 counterPartyTokenAmount, uint256 liquidity) = i_uniswapRouter.addLiquidity({
             tokenA: address(token),
             tokenB: address(counterPartyToken),
+            //@audit-high Incorrect token amount calculation for liquidity provision
             amountADesired: amountOfTokenToSwap + amounts[0],
             amountBDesired: amounts[1],
+            //@audit-med Setting these to 0 provides no MEV/sandwich attack protection
             amountAMin: 0,
             amountBMin: 0,
             to: address(this),
             deadline: block.timestamp
         });
+        //@audit-med inconistency with the event emission
+        // event UniswapInvested(uint256 tokenAmount, uint256 wethAmount, uint256 liquidity);
         emit UniswapInvested(tokenAmount, counterPartyTokenAmount, liquidity);
     }
 
@@ -88,9 +95,12 @@ contract UniswapAdapter is AStaticUSDCData {
      * @param token The vault's underlying asset token
      * @param liquidityAmount The amount of LP tokens to burn
      */
+    //@audit-info no netspec for return parameter
     function _uniswapDivest(IERC20 token, uint256 liquidityAmount) internal returns (uint256 amountOfAssetReturned) {
         IERC20 counterPartyToken = token == i_weth ? i_tokenOne : i_weth;
-
+        
+        //@audit-high not approval given for the access of LP tokens
+        //@audit-med no protection against slippage
         (uint256 tokenAmount, uint256 counterPartyTokenAmount) = i_uniswapRouter.removeLiquidity({
             tokenA: address(token),
             tokenB: address(counterPartyToken),
@@ -101,6 +111,11 @@ contract UniswapAdapter is AStaticUSDCData {
             deadline: block.timestamp
         });
         s_pathArray = [address(counterPartyToken), address(token)];
+        //@audit-med no protection against slippage
+        //[counterPartyToken - 0, underlyingToken - 1]
+        //@audit-high missing approval for counterParty token
+        //counterPartyToken.approve(address(i_uniswapRouter), counterPartyTokenAmount);
+
         uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
             amountIn: counterPartyTokenAmount,
             amountOutMin: 0,
@@ -108,7 +123,11 @@ contract UniswapAdapter is AStaticUSDCData {
             to: address(this),
             deadline: block.timestamp
         });
+        //tokenAmount, wethAmount
+        //@audit-med think there is an issue with the emission. The event expects wethAmount but you're passing amounts[1] which could be any token depending on the swap direction. This is misleading and inconsistent
+        //total underlying token amount = tokenAmount + amounts[1]
         emit UniswapDivested(tokenAmount, amounts[1]);
+        //@audit-high incorrect return value tokenAmount + amounts[1]?
         amountOfAssetReturned = amounts[1];
     }
     // slither-disable-end reentrancy-benign

@@ -11,7 +11,7 @@ contract VaultGuardianGovernor is Governor, GovernorCountingSimple, GovernorVote
     constructor(IVotes _voteToken)
         Governor("VaultGuardianGovernor")
         GovernorVotes(_voteToken)
-        GovernorVotesQuorumFraction(4)
+        GovernorVotesQuorumFraction(4) //4%
     {}
 
     function votingDelay() public pure override returns (uint256) {

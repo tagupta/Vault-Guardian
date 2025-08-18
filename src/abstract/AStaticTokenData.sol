@@ -10,6 +10,7 @@ abstract contract AStaticTokenData is AStaticUSDCData {
     string public constant TOKEN_TWO_VAULT_NAME = "Vault Guardian LINK";
     string public constant TOKEN_TWO_VAULT_SYMBOL = "vgLINK";
 
+    //@audit-low not checking for address 0
     constructor(address weth, address tokenOne, address tokenTwo) AStaticUSDCData(weth, tokenOne) {
         i_tokenTwo = IERC20(tokenTwo);
     }

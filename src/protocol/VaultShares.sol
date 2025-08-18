@@ -150,6 +150,20 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
 
         uint256 shares = previewDeposit(assets);
         _deposit(_msgSender(), receiver, assets, shares);
+         
+        //@audit-low there is a precision problem
+        //@audit-high additional minting is creating unbacked shares, the vault does not have assets to back the additional fee shares
+        //@note User deposits 1000 tokens, gets 1000 shares
+        //You mint additional fee shares (e.g., 100 to guardian + 100 to DAO)
+        //Now there are 1200 total shares but only 1000 tokens backing them
+        //This dilutes all existing shareholders and creates an undercollateralized vault
+        //uint256 grossShares = previewDeposit(assets);
+        //uint256 feeShares = grossShares * 2 / i_guardianAndDaoCut; // 2 because guardian + DAO
+        //uint256 netSharesForUser = grossShares - feeShares;
+
+        //_deposit(_msgSender(), receiver, assets, netSharesForUser);
+        //_mint(i_guardian, feeShares / 2);
+        //_mint(i_vaultGuardians, feeShares / 2);
 
         _mint(i_guardian, shares / i_guardianAndDaoCut);
         _mint(i_vaultGuardians, shares / i_guardianAndDaoCut);
@@ -162,6 +176,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @notice Invests user deposited assets into the investable universe (hold, Uniswap, or Aave) based on the allocation data set by the vault guardian
      * @param assets The amount of assets to invest
      */
+    //@audit-low there is a precision loss
     function _investFunds(uint256 assets) private {
         uint256 uniswapAllocation = (assets * s_allocationData.uniswapAllocation) / ALLOCATION_PRECISION;
         uint256 aaveAllocation = (assets * s_allocationData.aaveAllocation) / ALLOCATION_PRECISION;

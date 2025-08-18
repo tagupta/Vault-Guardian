@@ -12,13 +12,14 @@ contract AaveAdapter {
 
     IPool public immutable i_aavePool;
 
+    //@audit-low not accounting for address 0
     constructor(address aavePool) {
         i_aavePool = IPool(aavePool);
     }
 
     /**
      * @notice Used by the vault to deposit vault's underlying asset token as lending amount in Aave v3
-     * @param asset The vault's underlying asset token 
+     * @param asset The vault's underlying asset token
      * @param amount The amount of vault's underlying asset token to invest
      */
     function _aaveInvest(IERC20 asset, uint256 amount) internal {
@@ -39,11 +40,9 @@ contract AaveAdapter {
      * @param token The vault's underlying asset token to withdraw
      * @param amount The amount of vault's underlying asset token to withdraw
      */
+    //@audit-low unused variable amountOfAssetReturned
     function _aaveDivest(IERC20 token, uint256 amount) internal returns (uint256 amountOfAssetReturned) {
-        i_aavePool.withdraw({
-            asset: address(token),
-            amount: amount,
-            to: address(this)
-        });
+        //@audit-high not giving approval to i_aavePool to burn it's aTokens before calling withdraw
+        i_aavePool.withdraw({asset: address(token), amount: amount, to: address(this)});
     }
 }

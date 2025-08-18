@@ -39,19 +39,22 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  */
 contract VaultGuardians is Ownable, VaultGuardiansBase {
     using SafeERC20 for IERC20;
-
+    
+    //@audit-info unused custom error
     error VaultGuardians__TransferFailed();
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     event VaultGuardians__UpdatedStakePrice(uint256 oldStakePrice, uint256 newStakePrice);
+    //@audit-low usused event
     event VaultGuardians__UpdatedFee(uint256 oldFee, uint256 newFee);
     event VaultGuardians__SweptTokens(address asset);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+    //@audit-low no zero address checks
     constructor(
         address aavePool,
         address uniswapV2Router,
@@ -70,6 +73,8 @@ contract VaultGuardians is Ownable, VaultGuardiansBase {
      */
     function updateGuardianStakePrice(uint256 newStakePrice) external onlyOwner {
         s_guardianStakePrice = newStakePrice;
+        //@audit-low wrong parameter values
+        // event VaultGuardians__UpdatedStakePrice(uint256 oldStakePrice, uint256 newStakePrice);
         emit VaultGuardians__UpdatedStakePrice(s_guardianStakePrice, newStakePrice);
     }
 
@@ -81,6 +86,9 @@ contract VaultGuardians is Ownable, VaultGuardiansBase {
      */
     function updateGuardianAndDaoCut(uint256 newCut) external onlyOwner {
         s_guardianAndDaoCut = newCut;
+        //@audit-low ambigious emit, updating guardian and DAO cut rather
+        //@audit-low wrong parameter values
+        // event VaultGuardians__UpdatedStakePrice(uint256 oldStakePrice, uint256 newStakePrice);
         emit VaultGuardians__UpdatedStakePrice(s_guardianAndDaoCut, newCut);
     }
 
@@ -90,6 +98,7 @@ contract VaultGuardians is Ownable, VaultGuardiansBase {
      * @dev Since this is owned by the DAO, the funds will always go to the DAO. 
      * @param asset The ERC20 to sweep
      */
+    //@audit-high funds going to the owner? Stealing I see.
     function sweepErc20s(IERC20 asset) external {
         uint256 amount = asset.balanceOf(address(this));
         emit VaultGuardians__SweptTokens(address(asset));
