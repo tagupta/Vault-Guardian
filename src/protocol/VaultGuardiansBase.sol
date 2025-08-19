@@ -181,9 +181,9 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
             tokenVault = new VaultShares(
                 IVaultShares.ConstructorData({
                     asset: token,
-                    //@audit-low incorrect vault name
+                    //@report-written known issue: incorrect vault name
                     vaultName: TOKEN_ONE_VAULT_NAME,
-                    //@audit-low incorrect vault symbol
+                    //@report-written known issue: incorrect vault symbol
                     vaultSymbol: TOKEN_ONE_VAULT_SYMBOL,
                     guardian: msg.sender,
                     allocationData: allocationData,
@@ -250,7 +250,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     /*//////////////////////////////////////////////////////////////
                            PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    //@audit-high the vgTokens are not being burned as guardians are quitting being the token guardians
+    //@report-written known issue: the vgTokens are not being burned as guardians are quitting being the token guardians
     //@note this way guardians can mint infinite DAO tokens and take the control over DAO
     function _quitGuardian(IERC20 token) private returns (uint256) {
         IVaultShares tokenVault = IVaultShares(s_guardians[msg.sender][token]);

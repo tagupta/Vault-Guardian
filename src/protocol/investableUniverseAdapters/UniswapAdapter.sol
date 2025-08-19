@@ -51,7 +51,7 @@ contract UniswapAdapter is AStaticUSDCData {
         if (!succ) {
             revert UniswapAdapter__TransferFailed();
         }
-        //@audit-med missing handling of minimum tokens a user should receive. can lead to slippage
+        //@report-written known issue: missing handling of minimum tokens a user should receive. can lead to slippage
         uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
             amountIn: amountOfTokenToSwap,
             amountOutMin: 0,
@@ -78,7 +78,7 @@ contract UniswapAdapter is AStaticUSDCData {
             //@audit-high Incorrect token amount calculation for liquidity provision
             amountADesired: amountOfTokenToSwap + amounts[0],
             amountBDesired: amounts[1],
-            //@audit-med Setting these to 0 provides no MEV/sandwich attack protection
+            //@report-written known issue: Setting these to 0 provides no MEV/sandwich attack protection
             amountAMin: 0,
             amountBMin: 0,
             to: address(this),
