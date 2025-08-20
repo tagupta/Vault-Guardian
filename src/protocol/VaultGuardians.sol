@@ -39,7 +39,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  */
 contract VaultGuardians is Ownable, VaultGuardiansBase {
     using SafeERC20 for IERC20;
-    
+
     //@audit-info unused custom error
     error VaultGuardians__TransferFailed();
 
@@ -98,7 +98,11 @@ contract VaultGuardians is Ownable, VaultGuardiansBase {
      * @dev Since this is owned by the DAO, the funds will always go to the DAO. 
      * @param asset The ERC20 to sweep
      */
-    //@audit-high funds going to the owner? Stealing I see.
+    //@audit-high
+    //@note 1. no access control => anyone can call this function and disrupt the protocol functionality
+    //@note 2. Any ERC20 token can be transferred. AaveATokens, Uniswap LP tokens. Causing a DOS attack for users to withdraw their assets
+    //3. There is no check against amount 0
+    //4. Can allow complete drainage of the wallet
     function sweepErc20s(IERC20 asset) external {
         uint256 amount = asset.balanceOf(address(this));
         emit VaultGuardians__SweptTokens(address(asset));

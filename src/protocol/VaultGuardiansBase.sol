@@ -64,7 +64,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     address private immutable i_aavePool;
     address private immutable i_uniswapV2Router;
     VaultGuardianToken private immutable i_vgToken;
-    
+
     //@audit-low unused variable
     uint256 private constant GUARDIAN_FEE = 0.1 ether;
 
@@ -161,7 +161,8 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     {
         //slither-disable-next-line uninitialized-local
         VaultShares tokenVault;
-        if (address(token) == address(i_tokenOne)) { //USDC
+        if (address(token) == address(i_tokenOne)) {
+            //USDC
             tokenVault = new VaultShares(
                 IVaultShares.ConstructorData({
                     asset: token,
@@ -177,7 +178,8 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
                     usdc: address(i_tokenOne)
                 })
             );
-        } else if (address(token) == address(i_tokenTwo)) { //LINK
+        } else if (address(token) == address(i_tokenTwo)) {
+            //LINK
             tokenVault = new VaultShares(
                 IVaultShares.ConstructorData({
                     asset: token,
@@ -291,6 +293,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
         if (!succ) {
             revert VaultGuardiansBase__TransferFailed();
         }
+        //@audit-high showing incorrect shares - linked to share distribution
         uint256 shares = tokenVault.deposit(s_guardianStakePrice, msg.sender);
         if (shares == 0) {
             revert VaultGuardiansBase__TransferFailed();

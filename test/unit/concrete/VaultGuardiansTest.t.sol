@@ -58,4 +58,38 @@ contract VaultGuardiansTest is Base_Test {
 
         assertEq(balanceAfter - balanceBefore, mintAmount);
     }
+
+    // //@audit-poc 
+    // function testMakingNonGuardianCallUpdateAllocationFunction() external {
+
+    // }
+    
+    
 }
+
+// contract MaliciousERC777 is ERC777 {
+//     address public vault;
+//     bool private _isReentering;
+    
+//     constructor() ERC777("Malicious", "MAL", new address[](0)) {}
+    
+//     function setVault(address _vault) external {
+//         vault = _vault;
+//     }
+    
+//     function tokensReceived(
+//         address operator,
+//         address from,
+//         address to,
+//         uint256 amount,
+//         bytes calldata data,
+//         bytes calldata operatorData
+//     ) external override {
+//         if (!_isReentering && to == vault) {
+//             _isReentering = true;
+//             // Re-enter the vault contract here
+//             IVault(vault).somePrivilegedFunction();
+//             _isReentering = false;
+//         }
+//     }
+// }

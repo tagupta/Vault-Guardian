@@ -148,9 +148,10 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
             revert VaultShares__DepositMoreThanMax(assets, maxDeposit(receiver));
         }
 
+        //@audit-high incorrect amount of shares are being minted because of computation of totalAssets present for calculation
         uint256 shares = previewDeposit(assets);
         _deposit(_msgSender(), receiver, assets, shares);
-         
+
         //@audit-low there is a precision problem
         //@audit-high additional minting is creating unbacked shares, the vault does not have assets to back the additional fee shares
         //@note User deposits 1000 tokens, gets 1000 shares
@@ -167,7 +168,8 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
 
         _mint(i_guardian, shares / i_guardianAndDaoCut);
         _mint(i_vaultGuardians, shares / i_guardianAndDaoCut);
-
+         
+         //@audit-high these assets should be determined based off the left shares 
         _investFunds(assets);
         return shares;
     }
@@ -177,12 +179,13 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @param assets The amount of assets to invest
      */
     //@audit-low there is a precision loss
+    //@audit-low not ensuring that uniswapAllocation > 0 and aaveAllocation > 0
     function _investFunds(uint256 assets) private {
         uint256 uniswapAllocation = (assets * s_allocationData.uniswapAllocation) / ALLOCATION_PRECISION;
+
         uint256 aaveAllocation = (assets * s_allocationData.aaveAllocation) / ALLOCATION_PRECISION;
-
         emit FundsInvested();
-
+        
         _uniswapInvest(IERC20(asset()), uniswapAllocation);
         _aaveInvest(IERC20(asset()), aaveAllocation);
     }
@@ -193,6 +196,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @notice Anyone can call this and pay the gas costs to rebalance the portfolio at any time. 
      * @dev We understand that this is horrible for gas costs. 
      */
+    //@note this function is giving free way to users/guardians to make the vault adjust based on new allocation data and then decide to withdraw/redeem
     function rebalanceFunds() public isActive divestThenInvest nonReentrant {}
 
     /**
@@ -201,6 +205,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * We first divest our assets so we get a good idea of how many assets we hold.
      * Then, we redeem for the user, and automatically reinvest.
      */
+    //@audit-info incorrect netspec
     function withdraw(uint256 assets, address receiver, address owner)
         public
         override(IERC4626, ERC4626)

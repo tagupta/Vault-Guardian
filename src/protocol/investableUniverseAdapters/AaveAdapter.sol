@@ -42,7 +42,6 @@ contract AaveAdapter {
      */
     //@report-written known issue unused variable amountOfAssetReturned
     function _aaveDivest(IERC20 token, uint256 amount) internal returns (uint256 amountOfAssetReturned) {
-        //@audit-high not giving approval to i_aavePool to burn it's aTokens before calling withdraw
         i_aavePool.withdraw({asset: address(token), amount: amount, to: address(this)});
     }
 }

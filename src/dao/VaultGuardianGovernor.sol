@@ -13,7 +13,7 @@ contract VaultGuardianGovernor is Governor, GovernorCountingSimple, GovernorVote
         GovernorVotes(_voteToken)
         GovernorVotesQuorumFraction(4) //4%
     {}
-    
+
     //@report-written known issue: incorrect returned value, expecting block numbers not time durations
     function votingDelay() public pure override returns (uint256) {
         return 1 days;
