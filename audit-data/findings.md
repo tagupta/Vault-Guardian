@@ -40,6 +40,137 @@ function testInvestmentUnableToGoThrough() external hasGuardian {
     });
 ```
 
+### [H-2] Missing Token Approval for Uniswap Router Before Swap Operation for `counterPartyToken` inside `UniswapAdapter::_uniswapDivest` leading to Denial of Service (DOS)
+
+**Description** The function attempts to swap `counterPartyToken` tokens via `swapExactTokensForTokens` without first approving the Uniswap router to spend the tokens.
+
+```js
+function _uniswapDivest(IERC20 token, uint256 liquidityAmount) internal returns (uint256 amountOfAssetReturned) {
+        IERC20 counterPartyToken = token == i_weth ? i_tokenOne : i_weth;
+
+        (uint256 tokenAmount, uint256 counterPartyTokenAmount) = i_uniswapRouter.removeLiquidity({
+            tokenA: address(token),
+            tokenB: address(counterPartyToken),
+            liquidity: liquidityAmount,
+            amountAMin: 0,
+            amountBMin: 0,
+            to: address(this),
+            deadline: block.timestamp
+        });
+        s_pathArray = [address(counterPartyToken), address(token)];
+
+@>      uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
+            amountIn: counterPartyTokenAmount,
+            amountOutMin: 0,
+            path: s_pathArray,
+            to: address(this),
+            deadline: block.timestamp
+        });
+        emit UniswapDivested(tokenAmount, amounts[1]);
+        amountOfAssetReturned = amounts[1];
+    }
+```
+
+**Impact**
+
+- Function will always revert during swap operation, making divest functionality completely broken
+- Users unable to withdraw their invested funds can cause denial of service (DOS) for the vault
+
+**Proof of Concepts**
+
+```js
+// After removeLiquidity, contract receives counterPartyToken
+(uint256 tokenAmount, uint256 counterPartyTokenAmount) = i_uniswapRouter.removeLiquidity(...);
+
+// This call will REVERT - router has no permission to spend counterPartyToken
+uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
+    amountIn: counterPartyTokenAmount, // Router tries to spend tokens it can't access
+    // ... other parameters
+});
+// Result: Transaction reverts with "ERC20: transfer amount exceeds allowance"
+```
+
+**Recommended mitigation** Add token approval for the Uniswap router before the swap operation
+
+```diff
++   bool succ = counterPartyToken.approve(address(i_uniswapRouter), counterPartyTokenAmount);
++   if (!succ) {
++       revert UniswapAdapter__TransferFailed();
++   }
+
+uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
+    amountIn: counterPartyTokenAmount,
+    amountOutMin: 0,
+    path: s_pathArray,
+    to: address(this),
+    deadline: block.timestamp
+});
+```
+
+### [M-1] Incorrect return value from `UniswapAdapter::_uniswapDivest`, excluding initial token amount
+
+**Description** The function returns only `amounts[1]` (tokens received from swap) but ignores `tokenAmount` (tokens received directly from liquidity removal). This results in an incomplete accounting of the total assets returned to the user, potentially causing economic loss in calling contracts that rely on this return value.
+
+Though the return value is not used in the current implementation, it can lead to issues if the function is called by other contracts that expect the total amount returned.
+
+```js
+ function _uniswapDivest(IERC20 token, uint256 liquidityAmount) internal returns (uint256 amountOfAssetReturned) {
+        IERC20 counterPartyToken = token == i_weth ? i_tokenOne : i_weth;
+        (uint256 tokenAmount, uint256 counterPartyTokenAmount) = i_uniswapRouter.removeLiquidity({
+            tokenA: address(token),
+            tokenB: address(counterPartyToken),
+            liquidity: liquidityAmount,
+            amountAMin: 0,
+            amountBMin: 0,
+            to: address(this),
+            deadline: block.timestamp
+        });
+        s_pathArray = [address(counterPartyToken), address(token)];
+        uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
+            amountIn: counterPartyTokenAmount,
+            amountOutMin: 0,
+            path: s_pathArray,
+            to: address(this),
+            deadline: block.timestamp
+        });
+        emit UniswapDivested(tokenAmount, amounts[1]);
+@>      amountOfAssetReturned = amounts[1];
+    }
+```
+
+**Impact**
+
+- Incorrect asset accounting leading to potential economic loss
+- Calling contracts may miscalculate available assets
+
+**Proof of Concepts**
+Assuming a scenario where a user divests liquidity from Uniswap, the function `_uniswapDivest` is called, and the user expects to receive back the total assets (both direct token receipt and swap proceeds).
+
+```js
+// User divests liquidity worth 1000 tokens total
+// removeLiquidity returns:
+// - tokenAmount = 500 USDC
+// - counterPartyTokenAmount = 500 WETH equivalent
+
+// After swap of 500 WETH:
+// - amounts[1] = ~500 USDC (from swap)
+
+// INCORRECT: Only returning swap proceeds
+amountOfAssetReturned = amounts[1]; // ~500 tokens
+
+// CORRECT: Should return total assets
+// amountOfAssetReturned = tokenAmount + amounts[1]; // ~1000 tokens
+
+// Result: User loses credit for 500 tokens
+```
+
+**Recommended mitigation**
+
+```diff
+-   amountOfAssetReturned = amounts[1];
++   amountOfAssetReturned = tokenAmount + amounts[1];
+```
+
 ### [L-1] Excessive Token Approval Beyond Required Amount iniside `UniswapAdapter::_uniswapInvest`
 
 **Description** The function `_uniswapInvest` approves `amountOfTokenToSwap + amounts[0]` tokens for the Uniswap router during liquidity addition, but `amounts[0]` represents the input amount from the swap (which equals `amountOfTokenToSwap`). This results in approving double the required amount `(2 * amountOfTokenToSwap)`.
@@ -125,6 +256,46 @@ function testDiscrepancyInEventEmission() external {
 +       emit UniswapInvested(counterPartyTokenAmount, tokenAmount, liquidity);
 +   } else {
 +       emit UniswapInvested(tokenAmount, counterPartyTokenAmount, liquidity);
++   }
+```
+
+### [L-3] Event Emission Inconsistency in `UniswapAdapter::_uniswapDivest`
+
+**Description** The emitted `UniswapDivested` event uses `amounts[1]` as the second parameter, but the event definition says it should specifically be `wethAmount`. This creates inconsistency between definition and implementation, potentially confusing external monitoring systems.
+
+```js
+    event UniswapDivested(uint256 tokenAmount, uint256 wethAmount);
+    emit UniswapDivested(tokenAmount, amounts[1]);
+```
+
+**Impact**
+
+- External systems expecting WETH amounts will receive incorrect data
+- Event monitoring and analytics systems may misinterpret token flows
+
+**Proof of Concepts**
+
+1. Token = USDC, counterPartyToken = WETH,
+2. WETH are swapped for USDC, amounts[1] is NOT WETH rather USDC
+3. This leads to confusion as the event suggests WETH amounts, but it is actually USDC amounts.
+
+**Recommended mitigation**
+
+1. Update event definition to match implementation
+
+```diff
+-   event UniswapDivested(uint256 tokenAmount, uint256 wethAmount);
++   event UniswapDivested(uint256 tokenAmount, uint256 counterPartyTokenAmount);
+```
+
+2. Emit consistent WETH amounts
+
+```diff
+-   emit UniswapDivested(tokenAmount, amounts[1]);
++   if (token == i_weth) {
++       emit UniswapDivested(counterPartyTokenAmount, tokenAmount);
++   } else {
++       emit UniswapDivested(tokenAmount, counterPartyTokenAmount);
 +   }
 ```
 

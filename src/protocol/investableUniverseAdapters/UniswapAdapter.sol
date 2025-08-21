@@ -5,6 +5,7 @@ import {IUniswapV2Router01} from "../../vendor/IUniswapV2Router01.sol";
 import {IUniswapV2Factory} from "../../vendor/IUniswapV2Factory.sol";
 import {AStaticUSDCData, IERC20} from "../../abstract/AStaticUSDCData.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {DecimalNormalizer} from '../DecimalNormalizer.sol';
 
 contract UniswapAdapter is AStaticUSDCData {
     error UniswapAdapter__TransferFailed();
@@ -35,10 +36,15 @@ contract UniswapAdapter is AStaticUSDCData {
      * @param token The vault's underlying asset token
      * @param amount The amount of vault's underlying asset token to use for the investment
      */
+    //uint256 decimals
     function _uniswapInvest(IERC20 token, uint256 amount) internal {
         IERC20 counterPartyToken = token == i_weth ? i_tokenOne : i_weth;
+        // uint256 normalizedTotalAmount = DecimalNormalizer.normalizeAmount(amount, decimals);
         // We will do half in WETH and half in the token
         uint256 amountOfTokenToSwap = amount / 2;
+        //@audit-q updating this for normalization testing
+        // uint256 amountOfTokenToSwap = normalizedTotalAmount / 2;
+
         // the path array is supplied to the Uniswap router, which allows us to create swap paths
         // in case a pool does not exist for the input token and the output token
         // however, in this case, we are sure that a swap path exists for all pair permutations of WETH, USDC and LINK
@@ -111,9 +117,7 @@ contract UniswapAdapter is AStaticUSDCData {
         s_pathArray = [address(counterPartyToken), address(token)];
         //@report-written known issue: no protection against slippage, amountOutMin: 0
         //[counterPartyToken - 0, underlyingToken - 1]
-        //@audit-high missing approval for counterParty token
-        //counterPartyToken.approve(address(i_uniswapRouter), counterPartyTokenAmount);
-
+        //@report-written missing approval for counterParty token
         uint256[] memory amounts = i_uniswapRouter.swapExactTokensForTokens({
             amountIn: counterPartyTokenAmount,
             amountOutMin: 0,
@@ -122,10 +126,10 @@ contract UniswapAdapter is AStaticUSDCData {
             deadline: block.timestamp
         });
         //tokenAmount, wethAmount
-        //@audit-med issue with the emission. The event expects wethAmount but you're passing amounts[1] which could be any token depending on the swap direction. This is misleading and inconsistent
+        //@report-written issue with the emission. The event expects wethAmount but you're passing amounts[1] which could be any token depending on the swap direction. This is misleading and inconsistent
         //total underlying token amount = tokenAmount + amounts[1]
         emit UniswapDivested(tokenAmount, amounts[1]);
-        //@audit-high incorrect return value tokenAmount + amounts[1]?
+        //@report-written incorrect return value tokenAmount + amounts[1]?
         amountOfAssetReturned = amounts[1];
     }
     // slither-disable-end reentrancy-benign

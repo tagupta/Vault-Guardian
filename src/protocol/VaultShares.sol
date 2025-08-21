@@ -28,6 +28,8 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
     AllocationData private s_allocationData;
 
     uint256 private constant ALLOCATION_PRECISION = 1_000;
+    //@audit-q adding for testing
+    uint256 private immutable i_decimals;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -70,6 +72,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         uint256 aaveAtokensBalance = i_aaveAToken.balanceOf(address(this));
 
         // Divest
+        //@audit-q adding this change for testing
         if (uniswapLiquidityTokensBalance > 0) {
             _uniswapDivest(IERC20(asset()), uniswapLiquidityTokensBalance);
         }
@@ -105,7 +108,9 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         // External calls
         i_aaveAToken =
             IERC20(IPool(constructorData.aavePool).getReserveData(address(constructorData.asset)).aTokenAddress);
+        //@audit-high returns always address 0 when constructorData.asset is weth
         i_uniswapLiquidityToken = IERC20(i_uniswapFactory.getPair(address(constructorData.asset), address(i_weth)));
+        i_decimals = constructorData.decimals;
     }
 
     /**
@@ -185,7 +190,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
 
         uint256 aaveAllocation = (assets * s_allocationData.aaveAllocation) / ALLOCATION_PRECISION;
         emit FundsInvested();
-        
+        //@audit-q adding this change for testing
         _uniswapInvest(IERC20(asset()), uniswapAllocation);
         _aaveInvest(IERC20(asset()), aaveAllocation);
     }

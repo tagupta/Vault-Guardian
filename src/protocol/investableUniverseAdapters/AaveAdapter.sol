@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import {IPool} from "../../vendor/IPool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {DecimalNormalizer} from '../DecimalNormalizer.sol';
 
 contract AaveAdapter {
     using SafeERC20 for IERC20;
@@ -22,11 +23,13 @@ contract AaveAdapter {
      * @param asset The vault's underlying asset token
      * @param amount The amount of vault's underlying asset token to invest
      */
+    //uint256 decimals
     function _aaveInvest(IERC20 asset, uint256 amount) internal {
         bool succ = asset.approve(address(i_aavePool), amount);
         if (!succ) {
             revert AaveAdapter__TransferFailed();
         }
+        // uint256 normalizedAmount = DecimalNormalizer.normalizeAmount(amount,decimals);
         i_aavePool.supply({
             asset: address(asset),
             amount: amount,
