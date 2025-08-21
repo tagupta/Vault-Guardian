@@ -59,24 +59,22 @@ contract VaultGuardiansTest is Base_Test {
         assertEq(balanceAfter - balanceBefore, mintAmount);
     }
 
-    // //@audit-poc 
+    // //@audit-poc
     // function testMakingNonGuardianCallUpdateAllocationFunction() external {
 
     // }
-    
-    
 }
 
 // contract MaliciousERC777 is ERC777 {
 //     address public vault;
 //     bool private _isReentering;
-    
+
 //     constructor() ERC777("Malicious", "MAL", new address[](0)) {}
-    
+
 //     function setVault(address _vault) external {
 //         vault = _vault;
 //     }
-    
+
 //     function tokensReceived(
 //         address operator,
 //         address from,

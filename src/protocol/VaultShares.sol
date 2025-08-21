@@ -29,7 +29,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
 
     uint256 private constant ALLOCATION_PRECISION = 1_000;
     //@audit-q adding for testing
-    uint256 private immutable i_decimals;
+    // uint256 private immutable i_decimals;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -72,7 +72,6 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         uint256 aaveAtokensBalance = i_aaveAToken.balanceOf(address(this));
 
         // Divest
-        //@audit-q adding this change for testing
         if (uniswapLiquidityTokensBalance > 0) {
             _uniswapDivest(IERC20(asset()), uniswapLiquidityTokensBalance);
         }
@@ -108,10 +107,10 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         // External calls
         i_aaveAToken =
             IERC20(IPool(constructorData.aavePool).getReserveData(address(constructorData.asset)).aTokenAddress);
-        //@audit-high returns always address 0 when constructorData.asset is weth
+        //@report-written returns always address 0 when constructorData.asset is weth
         i_uniswapLiquidityToken = IERC20(i_uniswapFactory.getPair(address(constructorData.asset), address(i_weth)));
-        i_decimals = constructorData.decimals;
-    }
+        // i_decimals = constructorData.decimals;
+        }
 
     /**
      * @notice Sets the vault as not active, which means that the vault guardian has quit
@@ -153,12 +152,12 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
             revert VaultShares__DepositMoreThanMax(assets, maxDeposit(receiver));
         }
 
-        //@audit-high incorrect amount of shares are being minted because of computation of totalAssets present for calculation
+        //@report-written incorrect amount of shares are being minted because of computation of totalAssets present for calculation
         uint256 shares = previewDeposit(assets);
         _deposit(_msgSender(), receiver, assets, shares);
 
         //@audit-low there is a precision problem
-        //@audit-high additional minting is creating unbacked shares, the vault does not have assets to back the additional fee shares
+        //@report-written additional minting is creating unbacked shares, the vault does not have assets to back the additional fee shares
         //@note User deposits 1000 tokens, gets 1000 shares
         //You mint additional fee shares (e.g., 100 to guardian + 100 to DAO)
         //Now there are 1200 total shares but only 1000 tokens backing them
@@ -173,8 +172,8 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
 
         _mint(i_guardian, shares / i_guardianAndDaoCut);
         _mint(i_vaultGuardians, shares / i_guardianAndDaoCut);
-         
-         //@audit-high these assets should be determined based off the left shares 
+
+        //@report-written these assets should be determined based off the left shares
         _investFunds(assets);
         return shares;
     }
@@ -210,7 +209,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * We first divest our assets so we get a good idea of how many assets we hold.
      * Then, we redeem for the user, and automatically reinvest.
      */
-    //@audit-info incorrect netspec
+    //@report-ignored incorrect netspec
     function withdraw(uint256 assets, address receiver, address owner)
         public
         override(IERC4626, ERC4626)

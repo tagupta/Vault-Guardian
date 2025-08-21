@@ -5,7 +5,7 @@ import {IUniswapV2Router01} from "../../vendor/IUniswapV2Router01.sol";
 import {IUniswapV2Factory} from "../../vendor/IUniswapV2Factory.sol";
 import {AStaticUSDCData, IERC20} from "../../abstract/AStaticUSDCData.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {DecimalNormalizer} from '../DecimalNormalizer.sol';
+import {DecimalNormalizer} from "../DecimalNormalizer.sol";
 
 contract UniswapAdapter is AStaticUSDCData {
     error UniswapAdapter__TransferFailed();

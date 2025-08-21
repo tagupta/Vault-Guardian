@@ -9,8 +9,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface IVaultShares is IERC4626, IVaultData {
     struct ConstructorData {
         IERC20 asset;
-        //@audit-q adding to test something:
-        uint256 decimals;
+        // uint256 decimals;
         string vaultName;
         string vaultSymbol;
         address guardian;

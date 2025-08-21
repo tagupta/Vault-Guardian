@@ -12,8 +12,10 @@ import {VaultGuardianGovernor} from "../../../src/dao/VaultGuardianGovernor.sol"
 import {VaultGuardianToken} from "../../../src/dao/VaultGuardianToken.sol";
 import {console} from "forge-std/console.sol";
 import {console2} from "forge-std/console2.sol";
-import {IERC20Errors} from '@openzeppelin/contracts/interfaces/draft-IERC6093.sol';
-import {UniswapAdapter} from 'src/protocol/investableUniverseAdapters/UniswapAdapter.sol';
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {UniswapAdapter} from "src/protocol/investableUniverseAdapters/UniswapAdapter.sol";
+import {stdError} from "forge-std/StdError.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract VaultGuardiansBaseTest is Base_Test {
     address public guardian = makeAddr("guardian");
@@ -40,7 +42,6 @@ contract VaultGuardiansBaseTest is Base_Test {
     event DinvestedFromGuardian(address guardianAddress, IERC20 token, uint256 amount);
     event GuardianUpdatedHoldingAllocation(address guardianAddress, IERC20 token);
     event UniswapInvested(uint256 tokenAmount, uint256 wethAmount, uint256 liquidity);
-
 
     function setUp() public override {
         Base_Test.setUp();
@@ -394,7 +395,6 @@ contract VaultGuardiansBaseTest is Base_Test {
 
     //@audit-poc //Similarly the attacker can back run the redeem call after updateHoldingAllocation() goes through
     function testGuardianStealingTheFundsByUpdatingAllocation() external hasGuardian hasTokenGuardian {
-
         usdc.mint(20 ether, user);
         vm.startPrank(user);
         usdc.approve(address(usdcVaultShares), 20 ether);
@@ -402,11 +402,10 @@ contract VaultGuardiansBaseTest is Base_Test {
         uint256 userShare = VaultShares(usdcVaultShares).balanceOf(user);
         console2.log("userShare: ", userShare);
         vm.stopPrank();
-        
 
         uint256 guardianShare = VaultShares(usdcVaultShares).balanceOf(guardian);
         console2.log("guardianShare: ", guardianShare);
-        
+
         // vm.prank(user);
         // uint256 assetsRecoveredByUser = VaultShares(usdcVaultShares).redeem(userShare, user, user);
         // console2.log("assetsRecoveredByUser: ", assetsRecoveredByUser);
@@ -414,7 +413,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
         vm.prank(guardian);
         vaultGuardians.updateHoldingAllocation(usdc, allocationDataNew);
-        
+
         //before calling the quit guardian, guardian waits for enough tokens to accumulate
         deal(address(usdc), address(usdcVaultShares), 1000 ether);
 
@@ -426,7 +425,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         VaultShares(usdcVaultShares).approve(address(vaultGuardians), guardianShare);
         uint256 assetsRecovered = vaultGuardians.quitGuardian(usdc);
         vm.stopPrank();
-    
+
         console2.log("assetsRecovered: ", assetsRecovered); //200.279951279549527148
     }
 
@@ -452,13 +451,12 @@ contract VaultGuardiansBaseTest is Base_Test {
         uint256 user2Share = VaultShares(usdcVaultShares).balanceOf(user2);
         console2.log("user2Share: ", user2Share);
         vm.stopPrank();
-        
+
         // AllocationData memory allocationDataNew = AllocationData(newAllocationData);
         vm.prank(guardian);
         vaultGuardians.updateHoldingAllocation(usdc, newAllocationData);
         // VaultShares(usdcVaultShares).rebalanceFunds();
 
-        
         address user3 = makeAddr("user 3");
         uint256 user3AmountToDeposit = 500 ether;
         usdc.mint(user3AmountToDeposit, user3);
@@ -468,29 +466,27 @@ contract VaultGuardiansBaseTest is Base_Test {
         uint256 user3Share = VaultShares(usdcVaultShares).balanceOf(user3);
         console2.log("user3Share: ", user3Share);
         vm.stopPrank();
-       
-        
+
         vm.startPrank(guardian);
         uint256 guardianShare = VaultShares(usdcVaultShares).maxRedeem(guardian);
         VaultShares(usdcVaultShares).approve(address(vaultGuardians), guardianShare);
         uint256 assetsRecovered = vaultGuardians.quitGuardian(usdc);
         vm.stopPrank();
-    
+
         console2.log("assetsRecovered: ", assetsRecovered);
 
         vm.startPrank(user2);
-        uint256 assetsRecoveredUser2 = VaultShares(usdcVaultShares).redeem(user2Share,user2, user2);
+        uint256 assetsRecoveredUser2 = VaultShares(usdcVaultShares).redeem(user2Share, user2, user2);
         console2.log("assetsRecoveredUser2: ", assetsRecoveredUser2);
     }
 
     //@audit-poc
-    function testGuardianUpdatingAllocaionForIncreasingShares() external hasGuardian{
+    function testGuardianUpdatingAllocaionForIncreasingShares() external hasGuardian {
         uint256 guardianShare = VaultShares(wethVaultShares).balanceOf(guardian);
-        console2.log("guardianShare: ",guardianShare);
+        console2.log("guardianShare: ", guardianShare);
         vm.prank(guardian);
         vaultGuardians.updateHoldingAllocation(weth, newAllocationData);
         VaultShares(wethVaultShares).rebalanceFunds();
-
 
         weth.mint(20 ether, user);
         vm.startPrank(user);
@@ -498,21 +494,22 @@ contract VaultGuardiansBaseTest is Base_Test {
         VaultShares(wethVaultShares).deposit(20 ether, user);
         vm.stopPrank();
         uint256 userShare = VaultShares(wethVaultShares).balanceOf(guardian);
-        console2.log("userShare: ",userShare);
+        console2.log("userShare: ", userShare);
         guardianShare = VaultShares(wethVaultShares).balanceOf(guardian);
-        console2.log("guardianShare after updating allocation: ",guardianShare);//200400000000000010.03
+        console2.log("guardianShare after updating allocation: ", guardianShare); //200400000000000010.03
     }
 
     //@audit-poc Reverting due to excess liquidity provision
     function testInvestmentUnableToGoThrough() external hasGuardian {
         vm.prank(guardian);
         vaultGuardians.updateHoldingAllocation(weth, newAllocationData);
-        
+
         vm.expectRevert();
         //Reverting with ERC20InsufficientBalance
         wethVaultShares.rebalanceFunds();
     }
     //@audit-poc showing discrepancy in the event emission of uniswap invest and divest
+
     function testDiscrepancyInEventEmission() external {
         weth.mint(mintAmount, guardian);
         uint256 amountToDeosit = stakePrice; //WETH amount
@@ -528,7 +525,106 @@ contract VaultGuardiansBaseTest is Base_Test {
     }
 
     //@audit-poc
-    function testInvestAndDivest() external hasGuardian{
+    function testInvestAndDivest() external hasGuardian {
         wethVaultShares.rebalanceFunds();
+    }
+    
+    //@audit-poc
+    function testUnbackedSharesMintingCausingUnderCollateralization() external{
+        AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
+
+        weth.mint(mintAmount, guardian);
+        vm.startPrank(guardian);
+        weth.approve(address(vaultGuardians), mintAmount);
+        address wethVault = vaultGuardians.becomeGuardian(allocationDataNew);
+        wethVaultShares = VaultShares(wethVault);
+        vm.stopPrank();
+
+        // user makes a deposit
+        weth.mint(7 ether, user);
+        vm.startPrank(user);
+        weth.approve(address(wethVaultShares), 7 ether);
+        wethVaultShares.deposit(7 ether, user);
+        vm.stopPrank();
+        
+        //user makes another deposit
+        weth.mint(5 ether, user);
+        vm.startPrank(user);
+        weth.approve(address(wethVaultShares), 5 ether);
+        wethVaultShares.deposit(5 ether, user);
+        vm.stopPrank();
+
+        uint256 totalSharesMinted = wethVaultShares.totalSupply(); //10.02
+        console2.log(totalSharesMinted);
+
+        //preview Withdraw
+        uint256 actualAssets = wethVaultShares.totalAssets();
+        uint256 expectedAssets = wethVaultShares.previewWithdraw(totalSharesMinted);
+        console2.log(expectedAssets, actualAssets);
+        assertGt(expectedAssets, actualAssets);
+    }
+
+    //@audit-poc
+    function testUnfairShareDistributionToUsers() external hasGuardian{
+        weth.mint(20 ether, user);
+        vm.startPrank(user);
+        weth.approve(address(wethVaultShares), 20 ether);
+        VaultShares(wethVaultShares).deposit(20 ether, user);
+        uint256 userShare = VaultShares(wethVaultShares).balanceOf(user);
+        console2.log("userShare: ", userShare); //40.079999999999999995
+        vm.stopPrank();
+
+        vm.prank(guardian);
+        // Holding 0 amount of assets in the vault
+        // Investing 50% of the total assets in uniswap
+        // Investing remaining 50% to the Aave
+        // newAllocationData = AllocationData(0, 500, 500);
+        vaultGuardians.updateHoldingAllocation(weth, newAllocationData);
+        // Rebalancing invest assets based off new allocation data
+        VaultShares(wethVaultShares).rebalanceFunds();
+        
+        assertEq(wethVaultShares.totalAssets(), 0);
+        //user deposits again
+        weth.mint(20 ether, user);
+        vm.startPrank(user);
+        weth.approve(address(wethVaultShares), 20 ether);
+        VaultShares(wethVaultShares).deposit(20 ether, user);
+        uint256 userShareNew = VaultShares(wethVaultShares).balanceOf(user);
+        //Without Rebalancing: 106.986879999999999982
+        //WithRebalancing: 1003603199999999999920.079999999999999995
+        console2.log("userShare: ", userShareNew);
+        vm.stopPrank();
+
+        uint256 totalSharesMinted = wethVaultShares.totalSupply();
+        vm.expectRevert(Math.MathOverflowedMulDiv.selector);
+        wethVaultShares.previewWithdraw(totalSharesMinted);
+    }
+
+    //@audit-poc
+    function testOverInvestmentOfFunds() external{
+        AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
+
+        weth.mint(mintAmount, guardian);
+        vm.startPrank(guardian);
+        weth.approve(address(vaultGuardians), mintAmount);
+        address wethVault = vaultGuardians.becomeGuardian(allocationDataNew);
+        wethVaultShares = VaultShares(wethVault);
+        vm.stopPrank();
+        
+        uint256 assetsToInvest = 25 ether;
+        weth.mint(assetsToInvest, user);
+        vm.startPrank(user);
+        weth.approve(address(wethVaultShares), assetsToInvest);
+
+        uint256 userShares = wethVaultShares.previewDeposit(assetsToInvest);
+        uint256 feeShares = userShares * 2 / wethVaultShares.getGuardianAndDaoCut();
+        
+        uint256 totalSharesCreated = userShares + feeShares;
+
+        uint256 actualAssetsToInvest = assetsToInvest * userShares / totalSharesCreated;
+        wethVaultShares.deposit(assetsToInvest, user);
+        vm.stopPrank();
+        assertLt(actualAssetsToInvest, assetsToInvest);
+
     }
 }

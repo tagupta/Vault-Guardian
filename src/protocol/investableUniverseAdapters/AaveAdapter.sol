@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 import {IPool} from "../../vendor/IPool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {DecimalNormalizer} from '../DecimalNormalizer.sol';
+import {DecimalNormalizer} from "../DecimalNormalizer.sol";
 
 contract AaveAdapter {
     using SafeERC20 for IERC20;
@@ -13,7 +13,7 @@ contract AaveAdapter {
 
     IPool public immutable i_aavePool;
 
-    //@audit-low not accounting for address 0
+    //@report-ignored not accounting for address 0
     constructor(address aavePool) {
         i_aavePool = IPool(aavePool);
     }

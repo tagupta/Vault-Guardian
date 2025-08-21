@@ -133,7 +133,6 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
         VaultShares wethVault = new VaultShares(
             IVaultShares.ConstructorData({
                 asset: i_weth,
-                decimals: 18,
                 vaultName: WETH_VAULT_NAME,
                 vaultSymbol: WETH_VAULT_SYMBOL,
                 guardian: msg.sender,
@@ -167,7 +166,6 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
             tokenVault = new VaultShares(
                 IVaultShares.ConstructorData({
                     asset: token,
-                    decimals: 6,
                     vaultName: TOKEN_ONE_VAULT_NAME,
                     vaultSymbol: TOKEN_ONE_VAULT_SYMBOL,
                     guardian: msg.sender,
@@ -185,7 +183,6 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
             tokenVault = new VaultShares(
                 IVaultShares.ConstructorData({
                     asset: token,
-                    decimals: 18,
                     //@report-written known issue: incorrect vault name
                     vaultName: TOKEN_ONE_VAULT_NAME,
                     //@report-written known issue: incorrect vault symbol
