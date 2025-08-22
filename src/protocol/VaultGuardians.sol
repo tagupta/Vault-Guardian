@@ -40,21 +40,21 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract VaultGuardians is Ownable, VaultGuardiansBase {
     using SafeERC20 for IERC20;
 
-    //@audit-info unused custom error
+    //@report-written unused custom error
     error VaultGuardians__TransferFailed();
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     event VaultGuardians__UpdatedStakePrice(uint256 oldStakePrice, uint256 newStakePrice);
-    //@audit-low usused event
+    //@report-written usused event
     event VaultGuardians__UpdatedFee(uint256 oldFee, uint256 newFee);
     event VaultGuardians__SweptTokens(address asset);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    //@audit-low no zero address checks
+    //@report-written no zero address checks
     constructor(
         address aavePool,
         address uniswapV2Router,
@@ -73,7 +73,7 @@ contract VaultGuardians is Ownable, VaultGuardiansBase {
      */
     function updateGuardianStakePrice(uint256 newStakePrice) external onlyOwner {
         s_guardianStakePrice = newStakePrice;
-        //@audit-low wrong parameter values
+        //@report-written wrong parameter values
         // event VaultGuardians__UpdatedStakePrice(uint256 oldStakePrice, uint256 newStakePrice);
         emit VaultGuardians__UpdatedStakePrice(s_guardianStakePrice, newStakePrice);
     }
@@ -86,8 +86,8 @@ contract VaultGuardians is Ownable, VaultGuardiansBase {
      */
     function updateGuardianAndDaoCut(uint256 newCut) external onlyOwner {
         s_guardianAndDaoCut = newCut;
-        //@audit-low ambigious emit, updating guardian and DAO cut rather
-        //@audit-low wrong parameter values
+        //@report-written ambigious emit, updating guardian and DAO cut rather
+        //@report-written wrong parameter values
         // event VaultGuardians__UpdatedStakePrice(uint256 oldStakePrice, uint256 newStakePrice);
         emit VaultGuardians__UpdatedStakePrice(s_guardianAndDaoCut, newCut);
     }
@@ -98,7 +98,7 @@ contract VaultGuardians is Ownable, VaultGuardiansBase {
      * @dev Since this is owned by the DAO, the funds will always go to the DAO. 
      * @param asset The ERC20 to sweep
      */
-    //@audit-high
+    //@report-written
     //@note 1. no access control => anyone can call this function and disrupt the protocol functionality
     //@note 2. Any ERC20 token can be transferred. AaveATokens, Uniswap LP tokens. Causing a DOS attack for users to withdraw their assets
     //3. There is no check against amount 0

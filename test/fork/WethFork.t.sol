@@ -32,7 +32,7 @@ contract WethForkTest is Fork_Test {
     }
 
     modifier hasGuardian() {
-        //@audit-low there doesn't seem to work for mainnet rather do this
+        //@report-ignored there doesn't seem to work for mainnet rather do this
         deal(address(weth), guardian, mintAmount);
         // weth.mint(mintAmount, guardian);
         vm.startPrank(guardian);

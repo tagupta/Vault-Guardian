@@ -42,8 +42,6 @@ contract UniswapAdapter is AStaticUSDCData {
         // uint256 normalizedTotalAmount = DecimalNormalizer.normalizeAmount(amount, decimals);
         // We will do half in WETH and half in the token
         uint256 amountOfTokenToSwap = amount / 2;
-        //@audit-q updating this for normalization testing
-        // uint256 amountOfTokenToSwap = normalizedTotalAmount / 2;
 
         // the path array is supplied to the Uniswap router, which allows us to create swap paths
         // in case a pool does not exist for the input token and the output token
@@ -81,8 +79,8 @@ contract UniswapAdapter is AStaticUSDCData {
             tokenA: address(token),
             tokenB: address(counterPartyToken),
             //@report-written Incorrect token amount calculation for liquidity provision
-            amountADesired: amountOfTokenToSwap + amounts[0],
-            // amountADesired: amountOfTokenToSwap,
+            // amountADesired: amountOfTokenToSwap + amounts[0],
+            amountADesired: amountOfTokenToSwap,
             amountBDesired: amounts[1],
             //@report-written known issue: Setting these to 0 provides no MEV/sandwich attack protection
             amountAMin: 0,

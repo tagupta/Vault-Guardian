@@ -43,14 +43,14 @@ import {VaultGuardianToken} from "../dao/VaultGuardianToken.sol";
 contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     using SafeERC20 for IERC20;
 
-    //@audit-info unused custom error
+    //@report-written unused custom error
     error VaultGuardiansBase__NotEnoughWeth(uint256 amount, uint256 amountNeeded);
     error VaultGuardiansBase__NotAGuardian(address guardianAddress, IERC20 token);
-    //@audit-info unused custom error
+    //@report-written unused custom error
     error VaultGuardiansBase__CantQuitGuardianWithNonWethVaults(address guardianAddress);
     error VaultGuardiansBase__CantQuitWethWithThisFunction();
     error VaultGuardiansBase__TransferFailed();
-    //@audit-info unused custom error
+    //@report-written unused custom error
     error VaultGuardiansBase__FeeTooSmall(uint256 fee, uint256 requiredFee);
     error VaultGuardiansBase__NotApprovedToken(address token);
 
@@ -65,7 +65,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     address private immutable i_uniswapV2Router;
     VaultGuardianToken private immutable i_vgToken;
 
-    //@audit-low unused variable
+    //@report-written unused variable
     uint256 private constant GUARDIAN_FEE = 0.1 ether;
 
     // DAO updatable values
@@ -81,9 +81,9 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     //////////////////////////////////////////////////////////////*/
     event GuardianAdded(address guardianAddress, IERC20 token);
     event GaurdianRemoved(address guardianAddress, IERC20 token);
-    //@audit-info unused event
+    //@report-written unused event
     event InvestedInGuardian(address guardianAddress, IERC20 token, uint256 amount);
-    //@audit-info unused event
+    //@report-written unused event
     event DinvestedFromGuardian(address guardianAddress, IERC20 token, uint256 amount);
     event GuardianUpdatedHoldingAllocation(address guardianAddress, IERC20 token);
 
@@ -100,7 +100,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    //@audit-info no zero address checks
+    //@report-written no zero address checks, parameters are coming from vaultGuardian
     constructor(
         address aavePool,
         address uniswapV2Router,
@@ -127,8 +127,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
      * 
      * @param wethAllocationData the allocation data for the WETH vault
      */
-    //@audit-q shouldn't this function be payable?
-    //@audit-high Guardian fee is not being collected, function is not payable
+    //@report-written Guardian fee is not being collected, function is not payable
     function becomeGuardian(AllocationData memory wethAllocationData) external returns (address) {
         VaultShares wethVault = new VaultShares(
             IVaultShares.ConstructorData({
@@ -259,7 +258,6 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
         s_guardians[msg.sender][token] = IVaultShares(address(0));
         emit GaurdianRemoved(msg.sender, token);
         tokenVault.setNotActive();
-        //@audit-q are these shares solely belong to the guardian or these shares also include the shares of user's deposits
         uint256 maxRedeemable = tokenVault.maxRedeem(msg.sender);
         uint256 numberOfAssetsReturned = tokenVault.redeem(maxRedeemable, msg.sender, msg.sender);
         return numberOfAssetsReturned;

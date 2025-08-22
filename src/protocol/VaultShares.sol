@@ -28,8 +28,6 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
     AllocationData private s_allocationData;
 
     uint256 private constant ALLOCATION_PRECISION = 1_000;
-    //@audit-q adding for testing
-    // uint256 private immutable i_decimals;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS

