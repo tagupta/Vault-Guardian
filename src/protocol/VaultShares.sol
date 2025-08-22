@@ -156,7 +156,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         uint256 shares = previewDeposit(assets);
         _deposit(_msgSender(), receiver, assets, shares);
 
-        //@audit-low there is a precision problem
+        //@report-written there is a precision problem
         //@report-written additional minting is creating unbacked shares, the vault does not have assets to back the additional fee shares
         //@note User deposits 1000 tokens, gets 1000 shares
         //You mint additional fee shares (e.g., 100 to guardian + 100 to DAO)
@@ -182,14 +182,13 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @notice Invests user deposited assets into the investable universe (hold, Uniswap, or Aave) based on the allocation data set by the vault guardian
      * @param assets The amount of assets to invest
      */
-    //@audit-low there is a precision loss
-    //@audit-low not ensuring that uniswapAllocation > 0 and aaveAllocation > 0
+    //@report-ignored there is a precision loss
+    //@report-written not ensuring that uniswapAllocation > 0 and aaveAllocation > 0, linking this to refraining of 0 allocation such as (1000, 0, 0)
     function _investFunds(uint256 assets) private {
         uint256 uniswapAllocation = (assets * s_allocationData.uniswapAllocation) / ALLOCATION_PRECISION;
 
         uint256 aaveAllocation = (assets * s_allocationData.aaveAllocation) / ALLOCATION_PRECISION;
         emit FundsInvested();
-        //@audit-q adding this change for testing
         _uniswapInvest(IERC20(asset()), uniswapAllocation);
         _aaveInvest(IERC20(asset()), aaveAllocation);
     }

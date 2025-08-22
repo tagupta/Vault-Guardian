@@ -526,6 +526,75 @@ function deposit(uint256 assets, address receiver)
     }
 ```
 
+### [H-8] Zero allocations for Uniswap and Aave allow guardians to drain vault through share manipulation such as 1000, 0, 0 allocation
+
+**Description** **Guardians** can manipulate vault allocations by setting _Uniswap_ and _Aave_ allocations to `zero`, causing all deposited funds to remain uninvested in the vault contract.
+
+This creates a scenario where `totalAssets()` accurately reflects the vault balance while share calculations remain based on artificially low values.
+
+Guardians can exploit this by timing their withdrawals by seeting allocations to `0` to redeem significantly more assets than their shares should represent.
+
+**Impact**
+
+- Guardians can drain vault funds through allocation manipulation
+- Complete breakdown of vault share-to-asset ratio integrity
+- After sometime protocol becomes unusable due to guardian exploitation risk.
+
+**Proof of Concepts**
+
+<details>
+<summary>Proof Of Code (POC)</summary>
+
+```js
+ function testGuardianStealingByUpdatingAllocation() external hasGuardian hasTokenGuardian{
+        usdc.mint(20 ether, user);
+        vm.startPrank(user);
+        usdc.approve(address(usdcVaultShares), 20 ether);
+        VaultShares(usdcVaultShares).deposit(20 ether, user);
+        uint256 userShare = VaultShares(usdcVaultShares).balanceOf(user);
+        console2.log("userShare: ", userShare);
+        vm.stopPrank();
+
+        uint256 guardianShare = VaultShares(usdcVaultShares).balanceOf(guardian);
+        console2.log("guardianShare: ", guardianShare);
+
+        AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
+        vm.prank(guardian);
+        vaultGuardians.updateHoldingAllocation(usdc, allocationDataNew);
+
+        //before calling the quit guardian, guardian waits for enough tokens to accumulate
+        deal(address(usdc), address(usdcVaultShares), 1000 ether);
+
+
+        vm.startPrank(guardian);
+        VaultShares(usdcVaultShares).approve(address(vaultGuardians), guardianShare);
+        uint256 assetsRecovered = vaultGuardians.quitGuardian(usdc);
+        vm.stopPrank();
+
+        console2.log("assetsRecovered: ", assetsRecovered); //158.31263072845481799
+    }
+```
+
+</details>
+
+**Recommended mitigation** Minimum allocation per protocol
+
+```diff
++   uint256 public constant MINIMUM_PROTOCOL_ALLOCATION = 100; //10%
+
+function updateHoldingAllocation(AllocationData memory tokenAllocationData) public onlyVaultGuardians isActive {
+        uint256 totalAllocation = tokenAllocationData.holdAllocation + tokenAllocationData.uniswapAllocation
+            + tokenAllocationData.aaveAllocation;
+        if (totalAllocation != ALLOCATION_PRECISION) {
+            revert VaultShares__AllocationNot100Percent(totalAllocation);
+        }
++       require(tokenAllocationData.uniswapAllocation >= MINIMUM_PROTOCOL_ALLOCATION, "Uniswap allocation too low");
++       require(tokenAllocationData.aaveAllocation >= MINIMUM_PROTOCOL_ALLOCATION, "Aave allocation too low");
+        s_allocationData = tokenAllocationData;
+        emit UpdatedAllocation(tokenAllocationData);
+    }
+```
+
 ### [M-1] `UniswapAdapter::_uniswapDivest` returns incorrect asset amount extracted from Uniswap
 
 **Description** The function returns only `amounts[1]` (tokens received from swap) but ignores `tokenAmount` (tokens received directly from liquidity removal). This results in an incomplete accounting of the total assets returned to the user, potentially causing economic loss in calling contracts that rely on this return value.
@@ -717,6 +786,51 @@ function testDiscrepancyInEventEmission() external {
 +       emit UniswapDivested(tokenAmount, counterPartyTokenAmount);
 +   }
 ```
+
+### [L-4] Fee share can truncate to zero for small deposits bypassing protocol revenue
+
+**Description** The fee calculation using integer division `(shares / i_guardianAndDaoCut)` truncates to zero when the user's share amount is smaller than the `i_guardianAndDaoCut` value.
+
+This allows users to make small deposits without paying any fees to the guardian and DAO, completely bypassing the intended fee mechanism and depriving the protocol of revenue.
+
+**Impact**
+
+- Unfair advantage for users making multiple small deposits vs. single large deposit
+- Protocol loses fee revenue from small deposits
+
+**Proof of Concepts**
+
+1. User intends to deposit a small amount of WETH (e.g., 899 wei).
+2. The `previewDeposit` function calculates shares based on the current total assets and returns a share amount that is less than `i_guardianAndDaoCut`.
+3. Resulting fee shares calculated as `(userShares / i_guardianAndDaoCut)` truncates to zero.
+
+```js
+function testPrecisionLossDueToSmallDeposits() external {
+        AllocationData memory allocationDataNew = AllocationData(1000, 0, 0);
+
+        weth.mint(mintAmount, guardian);
+        vm.startPrank(guardian);
+        weth.approve(address(vaultGuardians), mintAmount);
+        address wethVault = vaultGuardians.becomeGuardian(allocationDataNew);
+        wethVaultShares = VaultShares(wethVault);
+        vm.stopPrank();
+
+        uint256 amountToInvest = 899;
+        weth.mint(amountToInvest, user);
+        vm.startPrank(user);
+        weth.approve(address(wethVaultShares), amountToInvest);
+        uint256 userShares = wethVaultShares.previewDeposit(amountToInvest);
+        uint256 feeSharesEach = userShares / wethVaultShares.getGuardianAndDaoCut();
+        uint256 feeShares = feeSharesEach * 2;
+        // This will truncate to zero if userShares < i_guardianAndDaoCut
+        assertEq(feeShares, 0);
+    }
+```
+
+**Recommended mitigation**
+
+1. Set a minimum deposit threshold for refraining users from depositing dust amounts to avoid fee truncation to zero.
+2. Alternatively, revert when the shares are zero.
 
 ### [I-1] Empty Interface Definition for `IInvestableUniverseAdapter` with unused import
 

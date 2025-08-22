@@ -293,7 +293,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
         if (!succ) {
             revert VaultGuardiansBase__TransferFailed();
         }
-        //@audit-high showing incorrect shares - linked to share distribution
+        //@report-written showing incorrect shares - mentioned in the deposit function
         uint256 shares = tokenVault.deposit(s_guardianStakePrice, msg.sender);
         if (shares == 0) {
             revert VaultGuardiansBase__TransferFailed();
